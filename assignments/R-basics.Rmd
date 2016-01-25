@@ -1,0 +1,51 @@
+---
+title: "R Basics Assignment"
+author: "Sarah Wiegreffe"
+date: "January 13, 2016"
+output: pdf_document
+---
+
+Solutions to hw1:
+
+1) What are the names of the columns in this dataset?
+
+```{r}
+data = read.csv('http://dmcglinn.github.io/quant_methods/data/tgpp.csv', header = TRUE)
+colnames(data)
+```
+
+2) How many rows and columns does this data file have?
+
+```{r}
+dim(data)
+```
+
+(in the order: rows columns)
+
+3) What kind of object is each data column? 
+
+```{r}
+sapply(data,class)
+```
+
+4) What are the values of the the datafile for rows 1, 5, and 8 at columns 3, 7, and 10?
+
+```{r}
+data[c(1,5,8), c(3,7,10)]
+```
+
+5) Create a pdf of the relationship between the variables "scale" and "richness". Scale is the area in square meters of the quadrat in which richness was recorded. Be sure to label your axes clearly, and choose a color you find pleasing for the points. To get a list of available stock colors use the function colors(). Also see this link: http://research.stowers-institute.org/efg/R/Color/Chart/index.htm.
+
+```{r}
+plot(data$scale, data$richness, xlab = 'Scale', ylab = 'Richness', col = 'violet')
+```
+
+6) What happens to your plot when you set the plot argument log equal to 'xy'?
+
+The values on the x-axis are transformed using a logarithmic function and the distribution of the points becomes more even.
+
+```{r}
+plot(data$scale, data$richness, xlab = 'Log of Scale', ylab = 'Log of Richness', col = 'violet', log = 'xy')
+```
+
+
