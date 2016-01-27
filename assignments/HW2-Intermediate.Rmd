@@ -39,17 +39,17 @@ The loops created a matrix storing the mean values of each of the four descripti
 
 2. Describe using pseudo-code how output was calculated.
 
-
---get the unique species names from the iris dataset and store them in a vector  
---create a matrix of zeros as placeholders with as many rows as there are unique species and as many columns as
-there are columns in the iris dataframe minus 1 (because Species is now a row, not a column)  
---name the rows after the unique species names  
---name the columns after the column names of the iris dataframe minus the last column  
---loop through each species name and subset the iris dataset to the rows of that species, removing the Species column since that is now redundant  
---loop through each trait (column) of the subset  
---if the subset has rows, loop through each row of the subset to sum up the values of each row for each             trait (column).  
---sum up the number of rows  
---calculate the mean of each trait for each species by dividing the sum of values by the number of rows  
+```{r}
+#get the unique species names from the iris dataset and store them in a vector  
+#create a matrix of zeros as placeholders with as many rows as there are unique species and as many columns as there are columns in the iris dataframe minus 1 (because Species is now a row, not a column)  
+#name the rows after the unique species names  
+#name the columns after the column names of the iris dataframe minus the last column  
+#loop through each species name and subset the iris dataset to the rows of that species, removing the Species column since that is now redundant  
+#     loop through each trait (column) of the subset  
+#if the subset has rows, loop through each row of the subset to sum up the values of each row for each trait (column).  
+#sum up the number of rows  
+#calculate the mean of each trait for each species by dividing the sum of values by the number of rows 
+```
         
 3. The variables in the loop were named so as to be vague. How can the objects output, x, and y could be renamed such that it is clearer what is occurring in the loop.
 
