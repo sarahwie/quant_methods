@@ -1,0 +1,138 @@
+---
+title: "HW3- Univariate Models"
+author: "Sarah Wiegreffe"
+date: "February 3, 2016"
+output: pdf_document
+---
+
+1. Carry out an exploratory analysis using the tree dataset. 
+Develop and compare models for species cover for a habitat generalist
+Acer rubrum (Red maple) 
+and a habitat specialist Abies fraseri (Frasier fir). 
+Because this dataset includes both continuous and discrete explanatory
+variables use the function `Anova` in the packages `car`.
+
+This will estimate partial effect sizes, variance explained, and p-values for 
+each explanatory variable included in the model. 
+
+Compare the p-values you observe using the function `Anova` to those generated using `summary`. 
+
+For each species address the following additional questions:
+
+    * how well does the exploratory model appear to explain cover?
+    * which explanatory variables are the most important?
+    * do model diagnostics indicate any problems with violations of
+      OLS assumptions?
+    * are you able to explain variance in one species better than another?
+
+```{r}
+#install.packages("car")
+library(car)
+
+trees = read.csv('./quant-methods-course-page/quant_methods/data/treedata_subset.csv')
+#colnames(trees)
+
+#Subset dataset, removing useless columns plotID (unique for each), species, and spcode
+acer = trees[trees$species == 'Acer rubrum', -c(1,2,3)]
+abies = trees[trees$species == 'Abies fraseri', -c(1,2,3)]
+
+#We have the following possibly significant independent variables: 
+#elev, tci, streamdist, disturb, and beers. We start with them all.
+mod_acer = lm(cover ~ elev + beers + tci + streamdist + disturb, data = acer)
+mod_abies = lm(cover ~ elev + beers + tci + streamdist + disturb, data = abies)
+
+#Now analyzing the model:
+Anova(mod_acer, type=3)
+summary(mod_acer)
+
+#Same procedure for mod_abies
+Anova(mod_abies, type=3)
+summary(mod_abies)
+
+#Compare two models
+AIC(mod_abies)
+AIC(mod_acer)
+
+#Model Diagnostics via plotting
+par(mfrow=c(2,2))
+plot(mod_acer)
+par(mfrow=c(2,2))
+plot(mod_abies)
+```
+
+The main difference between the Anova() and summary() model summaries is that summary() considers each level in a discrete variable (in this case, disturb) as its own independent variable, whereas Anova() provides a p-value for the variable as a whole, which is much more useful for analysis. The summary function also provides less precision in p-values.
+
+For both models, while there don't appear to be any significant outliers in the data, the residuals do not appear to be evenly dispersed about 0, but rather show a sloping trend which is disconcerting. This means that the OLS assuption of homoskedastic residuals appears to be violated for both models. Apart from this, the abies model appears to explain cover better than the acer model because it has smaller sum of squares value for the residuals. The most important explanatory variables for the abies model are elev and (somewhat) tci (can be seen after further updating the model). For acer, they are elev, beers, streamdist, and (somewhat) tci. It is much easier to explain variance in abies than acer model because the sum squared of the residuals is so much lower and it also has a much lower AIC.
+
+2. You may have noticed that the variable cover is defined as 
+positive integers between 1 and 10. and is therefore better treated
+as a discrete rather than continuous variable. 
+Re-examine your solutions to the question above but from the
+perspective of a General Linear Model (GLM) with a Poisson error term
+(rather than a Gaussian one as in OLS). 
+The Poisson distribution generates integers 0 to positive infinity so this may provide a good first approximation. 
+
+For assessing the degree of variation explained you can use a 
+pseudo-R-squared statistic (note this is just one of many possible).
+
+Compare the residual sums of squares between the traditional OLS 
+and glm models using `anova` (Note: not `Anova`) as such.
+
+Does it appear that changing the error distribution changed the
+results much? In what ways? 
+
+```{r}
+acer_glm = glm(cover ~ ., data= acer, family='poisson')
+acer_ols = glm(cover ~ ., data = acer, family='gaussian')
+
+abies_glm = glm(cover ~ ., data= abies, family='poisson')
+abies_ols = glm(cover ~ ., data = abies, family='gaussian')
+
+pseudo_r2 = function(glm_mod) {
+    1 -  glm_mod$deviance / glm_mod$null.deviance
+}
+
+pseudo_r2(acer_glm)
+pseudo_r2(abies_glm)
+
+anova(acer_ols, acer_glm)
+anova(abies_ols, abies_glm)
+
+Anova(abies_glm)
+Anova(abies_ols)
+Anova(acer_glm)
+Anova(acer_ols)
+```
+
+```{r, eval = FALSE}
+par(mfrow=c(2,2))
+plot(acer_glm)
+par(mfrow=c(2,2))
+plot(abies_glm)
+```
+
+By using a GLM model with a Poisson error term, the residual sum of squares for both the abies and acer models was reduced drastically, meaning that variance is much lower once cover has been considered as a discrete variable instead of continuous. By looking at the pseudo R^2 values from the glm's, we can see clearly that the abies exploratory model does a MUCH better job at explaining cover than the acer one. However, the plots still show some abnormal trends of residuals. Changing the error distribution did not appear to change the results (e.g. which variables are significant in the model) much at all (see Anova() output), but greatly improved the error and variance in the model.
+
+3. Provide a plain English summary (i.e., no statistics) of what you have
+found and what conclusions we can take away from your analysis?
+
+The abies model had fewer significant variables, and also relatedly much less variance (less sum squared of errors) than the acer model. We cannot assume OLS due to the heterskedasticity of the residuals for both models, so a generalized linear model with a Poisson error term was used and greatly reduced variance due to the fact that cover is a discrete variable. Some variables, such as disturb, were not at all significant in the models. Overall, the abies model performed much better than the acer one. 
+
+4. (optional) Examine the behavior of the function `step()` using the 
+exploratory models developed above. This is a very simple and not very
+robust machine learning stepwise algorithm that uses AIC to select a 
+best model. By default it does a backward selection routine. 
+
+```{r}
+new_mod_acer = step(mod_acer)
+AIC(mod_acer)
+AIC(new_mod_acer)
+anova(mod_acer, new_mod_acer)
+
+new_mod_abies = step(mod_abies)
+AIC(mod_abies)
+AIC(new_mod_abies)
+anova(mod_abies, new_mod_abies)
+```
+
+The step() function reduces the AIC of the models and improves them overall by removing variables that are not significant, simplifying the parameters to find the minimum adequate model.
