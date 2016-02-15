@@ -1,0 +1,99 @@
+---
+title: "HW4- Multivariate Models"
+author: "Sarah Wiegreffe"
+date: "February 10, 2016"
+output: pdf_document
+---
+
+For this assignment will be analyzing data on the Vegetation
+and Environment in Dutch Dune Meadows.
+
+To import the data and read the metadata run the following:
+
+```{r, include=FALSE}
+library(vegan)
+data(dune)
+data(dune.env)
+?dune
+```
+
+
+1. Conduct an indirect ordination on the dune plant community. Specifically,
+visually examine a NMDS plot using the bray-curtis distance metric. Below is 
+some code to help you develop a potential plot that emphasizes the role of the
+environmental variable "Moisture". Describe how you interpret the
+graphic. What is the goal of creating such a plot? Does this analysis suggest
+any interesting findings with respect to the dune vegetation?
+
+```{r}
+#Create community matrix
+#Already done
+
+#NMDS analysis
+dune_mds = metaMDS(dune)
+
+plot(dune_mds, type='n')
+text(dune_mds, 'sp', cex=.5)
+# generate vector of colors 
+color_vect = rev(terrain.colors(6))[-1]
+points(dune_mds, 'sites', pch=19, 
+  col=color_vect[dune.env$Moisture])
+legend('topright', paste("Moisture =", c(1,2,4,5), sep=''), 
+  col=color_vect, pch=19)
+
+#repeat plot for other environmental variables by changing the argument to the color vector...
+
+```
+
+From the graphic, one can conclude that moisture is a somewhat adequate explanation of variance among dune meadow vegetation among species in the dataset, since there is for most datapoints a distance between those of lower moisture (levels 1 and 2) and higher (levels 4 and 5). The goal of creating this plot is to determine what environmental variables explain the most variance in the dataset, which can be done by observing the position of the points in the dataset with respect to the two axes and their distance apart from one another, to see if there is a variable that explains the most variance. Examining the relationship between the points by grouping them by the other environmental variables (A1, Management, Use and Manure) did not produce the same type of visual relationship as with Moisture.
+
+2. Carry out a direct ordination using CCA in order to test any potential 
+hypotheses that you developed after examining the MDS plot. Specifically,
+carry out a test of the entire model (i.e., including all constrained axes)
+and also carry out tests at the scale of individual explanatory variables
+you included in your model if you included more than one variable. Plot your 
+results.
+
+```{r}
+dune_cca = cca(dune ~ ., data = dune.env)
+dune_cca
+
+#plot on all environmental variables
+plot(dune_cca, ylim=c(-6, 6), display=c('sp','bp'), scaling=1)
+
+```
+
+```{r, eval = FALSE}
+#plot only on moisture and other env variables
+plot(cca(dune ~ dune.env$Moisture), ylim=c(-6, 6), display=c('sp','bp'), scaling=1)
+cca(dune ~ dune.env$Moisture)
+plot(cca(dune ~ dune.env$A1), ylim=c(-6, 6), display=c('sp','bp'), scaling=1)
+cca(dune ~ dune.env$A1)
+plot(cca(dune ~ dune.env$Management), ylim=c(-6, 6), display=c('sp','bp'), scaling=1)
+cca(dune ~ dune.env$Management)
+plot(cca(dune ~ dune.env$Use), ylim=c(-6, 6), display=c('sp','bp'), scaling=1)
+cca(dune ~ dune.env$Use)
+plot(cca(dune ~ dune.env$Manure), ylim=c(-6, 6), display=c('sp','bp'), scaling=1)
+cca(dune ~ dune.env$Manure)
+```
+
+```{r}
+#Step to produce model
+mod0 = cca(dune ~ 1, data = dune.env)
+mod = step(mod0, scope = formula(dune_cca), test="perm", perm.max=100)
+plot(mod, ylim=c(-6, 6), display=c('sp','bp'), scaling=1)
+
+#Get details on model
+mod
+```
+
+From the first plot with all environmental variables, it is difficult to see which are the most significant in explaining variation- 2 dummy variables for management as well as a factor variable for both moisture and manure have the longest vectors. However this is not the best visualization because of potential correlation between variables. By using the step function and plotting the result of it, it appears that the most significant variable is Moisture alone, as we found in part 1. However, the statistics on this model shows that not much variance is explained by the constrained variables compared with our model including all environmental variables, although it is better than or at least as good as the performance of the other environmental variables.
+
+3. Do your two analyses agree with one another or complement one another or do
+these two analyses seem to be suggesting different take home messages? Which
+analysis do you find to be more useful?
+
+Both analyses seem to support the same results, although the outputs from the CCA provide more useful information about what numerical differences there are between modeling the different environmental variables. It is also helpful to get visualizations of the vectors of the environmental variables from the CCA to see their strength and direction.
+
+
+
