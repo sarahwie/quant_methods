@@ -1,0 +1,227 @@
+---
+title: "HW5- Spatial Models"
+author: "Sarah Wiegreffe"
+date: "February 17, 2016"
+output: pdf_document
+---
+
+```{r, warning=FALSE, message=FALSE}
+library(vegan)
+library(nlme)
+data(BCI)
+## UTM Coordinates (in metres)
+BCI_xy = data.frame(x = rep(seq(625754, 626654, by=100), each=5), 
+                    y = rep(seq(1011569,  1011969, by=100), len=50))
+```
+
+1) Examine if there is evidence of spatial dependence in a rare and a common
+species in the BCI tree dataset
+
+```{r, eval = TRUE, results="hide"}
+#subset dataset on rare and common species
+sub_common = BCI$Faramea.occidentalis
+sub_rare= BCI$Heisteria.concinna
+
+#check that models have few datapoints with 0 abundance and change species as necessary
+#hist(sub_common)
+#hist(sub_rare)
+```
+
+```{r}
+col_brks = hist(sub_common, plot=F)$breaks
+col_indices = as.numeric(cut(sub_common, col_brks))
+cols = rev(terrain.colors(length(col_brks)))
+plot(BCI_xy, cex=2, pch=19, col=cols[col_indices])
+
+col_brks = hist(sub_rare, plot=F)$breaks
+col_indices = as.numeric(cut(sub_rare, col_brks))
+cols = rev(terrain.colors(length(col_brks)))
+plot(BCI_xy, cex=2, pch=19, col=cols[col_indices])
+
+# calculate Euclidean distance between abundance and spatial coordinates
+abundance_dist_common = dist(sub_common)
+abundance_dist_rare = dist(sub_rare)
+xy_dist = dist(BCI_xy)
+
+max_dist = max(xy_dist) / 2
+
+# plot results
+plot(xy_dist, abundance_dist_common)
+abline(lm(abundance_dist_common ~ xy_dist), lwd=3, col='red')
+lines(lowess(xy_dist, abundance_dist_common), lwd=3, col='pink')
+abline(v = max_dist, col='red', lwd=3, lty=2)
+
+plot(xy_dist, abundance_dist_rare)
+abline(lm(abundance_dist_rare ~ xy_dist), lwd=3, col='red')
+lines(lowess(xy_dist, abundance_dist_rare), lwd=3, col='pink')
+abline(v = max_dist, col='red', lwd=3, lty=2)
+
+# compute correlation
+obs_cor_rare = cor(xy_dist, abundance_dist_rare)
+obs_cor_common = cor(xy_dist, abundance_dist_common)
+obs_cor_rare
+obs_cor_common
+
+# carry out a permutation test for significance:
+nperm = 1000
+null_cor = obs_cor_rare
+for (i in 2:nperm) {
+    # shuffle the rows of the spatial coordinates
+    tmp_xy = BCI_xy[sample(nrow(BCI_xy)), ]
+    # correlation between the shuffled spatial coordinates and sr_dist
+    null_cor[i] = cor(dist(tmp_xy), abundance_dist_rare)
+}
+# compute the p-value
+sum(null_cor >= obs_cor_rare) / nperm
+
+nperm = 1000
+null_cor = obs_cor_common
+for (i in 2:nperm) {
+    # shuffle the rows of the spatial coordinates
+    tmp_xy = BCI_xy[sample(nrow(BCI_xy)), ]
+    # correlation between the shuffled spatial coordinates and sr_dist
+    null_cor[i] = cor(dist(tmp_xy), abundance_dist_common)
+}
+# compute the p-value
+sum(null_cor >= obs_cor_common) / nperm
+
+```
+
+I chose to look at Heisteria.concinna as my rare species and the Faramea.occidentalis species for my common ones. From the visualization of locations of samples colored by their abundance for both species, there does not seem to be evidence of spatial dependence judging by the distribution of colors (abundances) over the plot. In the second plots, both hae a line slope of zero which implies there is no correlation between xy-position and abundance. Correlation values are very close to zero which supports this. Also, neither species had a p-value that showed significance of spatial dependence different from that of random chance from a permutation test.
+
+2) Build two generalized linear models to predict the abundance of the species
+*Drypetes standleyi* using the abundance of other tree species in the study site.
+Specifically examine the following species as predictor variables.
+
+* Model 1: only include a single species as a predictor variable
+
+* Model 2: include all of the species as predictor variables
+
+With both models examine the spatial dependence of the residuals using the 
+function `Variogram`. Model the spatial dependence in the residuals using one
+of the error structures available. 
+
+* Did including the spatial error term have a large impact on the coefficients
+of the model?
+
+* Did including the spatial error terms significantly improve model fit (use 
+function `anova` to carry out model comparison)?
+
+* Explain why modeling the spatial errors has a large influence in the first
+model but not in the second model. 
+
+```{r, results="hide"}
+sp_ids = c("Cordia.lasiocalyx", "Hirtella.triandra",
+           "Picramnia.latifolia", "Quassia.amara",
+           "Tabernaemontana.arborea", "Trattinnickia.aspera", 
+           "Xylopia.macrantha")
+
+abundance_response = BCI$Drypetes.standleyi
+
+abundance_df = data.frame(BCI$Drypetes.standleyi,BCI[,which(colnames(BCI) %in% sp_ids)],BCI_xy)
+
+#model with single predictor variable- Model 1
+abundance_lm_single = gls(abundance_response ~ Cordia.lasiocalyx, data=abundance_df, 
+        corr=corExp(form=~ x + y), control = glsControl(opt='optim',  msVerbose=T))
+
+par(mfrow=c(1,1))
+plot(Variogram(abundance_lm_single, form= ~ x + y))
+
+abundance_exp_single = update(abundance_lm_single, corr=corExp(form=~x + y))
+# examine fit of error model to the raw model residuals
+#plot(Variogram(abundance_exp_single, maxDist = max_dist))
+# examine the normalized residuals
+#plot(Variogram(abundance_exp_single, resType='normalized', maxDist = max_dist))
+
+# let's look at the same model but with a nugget
+abundance_exp_nug_single = update(abundance_exp_single, corr=corExp(form=~x + y, nugget=T))
+# Look to provide a better fit:
+#plot(Variogram(abundance_exp_nug_single, maxDist = max_dist))
+#plot(Variogram(abundance_exp_nug_single, resType = 'n', maxDist = max_dist))
+
+# let's examine the rational quadratic error model
+abundance_rat_nug_single = update(abundance_lm_single, corr=corRatio(form=~x + y, nugget=T))
+
+# examine fit of error model to model residuals
+plot(Variogram(abundance_rat_nug_single, maxDist = max_dist))
+```
+
+```{r}
+# Good fit:
+plot(Variogram(abundance_rat_nug_single, resType='n', maxDist = max_dist))
+
+# let's compare the models
+anova(abundance_lm_single, abundance_exp_single, abundance_exp_nug_single, 
+      abundance_rat_nug_single, test=F)
+
+summary(abundance_rat_nug_single)
+summary(abundance_lm_single)
+
+col_brks = hist(residuals(abundance_rat_nug_single), plot=F)$breaks
+col_indices = as.numeric(cut(residuals(abundance_rat_nug_single), col_brks))
+cols = rev(terrain.colors(length(col_brks)))
+plot(BCI_xy, cex=2, pch=19, col=cols[col_indices])
+```
+
+For Model 1, which includes Drypetes.standleyi as the predictor variable, the Variogram of the generalized linear model shows an upward trend which signifies spatial dependence of the residuals. In the Variogram of the normalized residuals there is somewhat of a trend present. The rational quadratic error model significantly improved model fit (supported by both its Variogram having the least variation and no trend and the anova results which show lowest AIC for this one of all 4 models). 
+
+Including the spatial error terms improved model fit as we can see from the anova() results. However, from the colored dots graph there does appear to still be spatial dependence.
+
+Including the spatial error term did not have a large impact on the coefficients of the model, as seen from the summary() output of the rational quadratic model compared to that of the glm.
+
+```{r, results="hide"}
+#model with all predictor variables- Model 2
+formula1 = as.formula(paste("abundance_response ~ ", paste(sp_ids, collapse= "+")))
+
+abundance_lm_all = gls(formula1, data=abundance_df, 
+        corr=corExp(form=~ x + y), control = glsControl(opt='optim',  msVerbose=T))
+
+par(mfrow=c(1,1))
+plot(Variogram(abundance_lm_all, form= ~ x + y))
+plot(Variogram(abundance_lm_all, resType='normalized', form= ~ x + y))
+#fit is good
+
+abundance_exp_all = update(abundance_lm_all, corr=corExp(form=~x + y))
+# examine fit of error model to the raw model residuals
+#plot(Variogram(abundance_exp_all, maxDist = max_dist))
+#worse fit
+# examine the normalized residuals
+#plot(Variogram(abundance_exp_all, resType='normalized', maxDist = max_dist))
+#fit is good
+
+# let's look at the same model but with a nugget
+abundance_exp_nug_all = update(abundance_exp_all, corr=corExp(form=~x + y, nugget=T))
+# Look to provide a better fit:
+#plot(Variogram(abundance_exp_nug_all, maxDist = max_dist))
+#plot(Variogram(abundance_exp_nug_all, resType = 'n', maxDist = max_dist))
+#neither are very good
+
+# let's examine the rational quadratic error model
+abundance_rat_nug_all = update(abundance_lm_all, corr=corRatio(form=~x + y, nugget=T))
+# examine fit of error model to model residuals
+#plot(Variogram(abundance_rat_nug_all, maxDist = max_dist))
+#plot(Variogram(abundance_rat_nug_all, resType='n', maxDist = max_dist))
+#neither are very good
+```
+
+```{r}
+# let's compare the models
+anova(abundance_lm_all, abundance_exp_all, abundance_exp_nug_all, 
+      abundance_rat_nug_all, test=F)
+
+summary(abundance_lm_all)
+summary(abundance_exp_nug_all)
+
+col_brks = hist(residuals(abundance_lm_all), plot=F)$breaks
+col_indices = as.numeric(cut(residuals(abundance_lm_all), col_brks))
+cols = rev(terrain.colors(length(col_brks)))
+plot(BCI_xy, cex=2, pch=19, col=cols[col_indices])
+
+```
+
+For Model 2, which includes multiple species as predictor variables, the Variogram of the generalized linear model shows an upward trend which signifies spatial dependence of the residuals, but the line has very good fit, and after normalizing the residuals the residuals appear mostly normally distributed with little trend. The generalized linear model performs the best/equally as good as the exponential model over the ones with nuggets (supported by both its Variogram having the least variation and no trend and the anova results which show lowest AIC for this model). 
+
+Improving the spatial error terms did not improve model fit as we can see from the anova() results, since the generalized linear model performed just as well if not better than the others. From the colored dots graph there does not appear to be a pattern of spatial dependence with this model. It also did not have a large impact on the coefficients of the model, which can be seen when comparing the summary() output of the glm model vs. the exponential model with a nugget, for example.
+
+Modeling the spatial errors has a large influence in the first model but not in the second model because the second model has many more predictor variables, so their individual effects/spatial relationships with the response variable (if some have spatial dependence) are less influential because of the presence of many other predictor variables. However, in the case of model 1 where a spatially dependent variable was the only
+predictor in the model, it had a large influence on the model.
